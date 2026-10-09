@@ -299,7 +299,12 @@ function CadastroPage() {
             </span>
           </div>
 
-          {pessoas.length === 0 ? (
+          {isLoading ? (
+            <p className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando cadastros...
+            </p>
+          ) : pessoas.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
               Nenhuma pessoa cadastrada ainda.
             </p>
