@@ -125,6 +125,7 @@ function CadastroPage() {
 
   function aoEnviar(evento: React.FormEvent) {
     evento.preventDefault();
+    setErroGeral(null);
     const resultado = pessoaSchema.safeParse(campos);
 
     if (!resultado.success) {
@@ -138,24 +139,12 @@ function CadastroPage() {
       return;
     }
 
-    const dados = resultado.data;
-    setPessoas((anterior) => [
-      ...anterior,
-      {
-        id: crypto.randomUUID(),
-        nome: dados.nome,
-        email: dados.email,
-        telefone: dados.telefone ?? "",
-        cidade: dados.cidade ?? "",
-      },
-    ]);
-    setCampos(campoVazio);
-    setErros({});
-    setSucesso(true);
+    cadastrarMutation.mutate(resultado.data);
   }
 
   function excluir(id: string) {
-    setPessoas((anterior) => anterior.filter((p) => p.id !== id));
+    setErroGeral(null);
+    excluirMutation.mutate(id);
   }
 
   return (
