@@ -55,8 +55,9 @@ type Pessoa = {
   id: string;
   nome: string;
   email: string;
-  telefone: string;
-  cidade: string;
+  telefone: string | null;
+  cidade: string | null;
+  created_at: string;
 };
 
 type Erros = Partial<Record<"nome" | "email" | "telefone" | "cidade", string>>;
