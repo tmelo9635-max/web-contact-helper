@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { UserPlus, Trash2, Users, CheckCircle2 } from "lucide-react";
+import { UserPlus, Trash2, Users, CheckCircle2, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -53,8 +55,9 @@ type Pessoa = {
   id: string;
   nome: string;
   email: string;
-  telefone: string;
-  cidade: string;
+  telefone: string | null;
+  cidade: string | null;
+  created_at: string;
 };
 
 type Erros = Partial<Record<"nome" | "email" | "telefone" | "cidade", string>>;
@@ -62,10 +65,57 @@ type Erros = Partial<Record<"nome" | "email" | "telefone" | "cidade", string>>;
 const campoVazio = { nome: "", email: "", telefone: "", cidade: "" };
 
 function CadastroPage() {
+  const queryClient = useQueryClient();
   const [campos, setCampos] = useState(campoVazio);
   const [erros, setErros] = useState<Erros>({});
-  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [sucesso, setSucesso] = useState(false);
+  const [erroGeral, setErroGeral] = useState<string | null>(null);
+
+  const { data: pessoas = [], isLoading } = useQuery({
+    queryKey: ["pessoas"],
+    queryFn: async (): Promise<Pessoa[]> => {
+      const { data, error } = await supabase
+        .from("pessoas")
+        .select("id, nome, email, telefone, cidade, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const cadastrarMutation = useMutation({
+    mutationFn: async (dados: z.infer<typeof pessoaSchema>) => {
+      const { error } = await supabase.from("pessoas").insert({
+        nome: dados.nome,
+        email: dados.email,
+        telefone: dados.telefone || null,
+        cidade: dados.cidade || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pessoas"] });
+      setCampos(campoVazio);
+      setErros({});
+      setSucesso(true);
+    },
+    onError: () => {
+      setErroGeral("Não foi possível salvar o cadastro. Tente novamente.");
+    },
+  });
+
+  const excluirMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("pessoas").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pessoas"] });
+    },
+    onError: () => {
+      setErroGeral("Não foi possível excluir o cadastro. Tente novamente.");
+    },
+  });
 
   function atualizar(campo: keyof typeof campoVazio, valor: string) {
     setCampos((anterior) => ({ ...anterior, [campo]: valor }));
@@ -75,6 +125,7 @@ function CadastroPage() {
 
   function aoEnviar(evento: React.FormEvent) {
     evento.preventDefault();
+    setErroGeral(null);
     const resultado = pessoaSchema.safeParse(campos);
 
     if (!resultado.success) {
@@ -88,24 +139,12 @@ function CadastroPage() {
       return;
     }
 
-    const dados = resultado.data;
-    setPessoas((anterior) => [
-      ...anterior,
-      {
-        id: crypto.randomUUID(),
-        nome: dados.nome,
-        email: dados.email,
-        telefone: dados.telefone ?? "",
-        cidade: dados.cidade ?? "",
-      },
-    ]);
-    setCampos(campoVazio);
-    setErros({});
-    setSucesso(true);
+    cadastrarMutation.mutate(resultado.data);
   }
 
   function excluir(id: string) {
-    setPessoas((anterior) => anterior.filter((p) => p.id !== id));
+    setErroGeral(null);
+    excluirMutation.mutate(id);
   }
 
   return (
@@ -218,11 +257,25 @@ function CadastroPage() {
 
           <button
             type="submit"
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            disabled={cadastrarMutation.isPending}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            <UserPlus className="h-4 w-4" />
-            Cadastrar
+            {cadastrarMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <UserPlus className="h-4 w-4" />
+            )}
+            {cadastrarMutation.isPending ? "Cadastrando..." : "Cadastrar"}
           </button>
+
+          {erroGeral && (
+            <div
+              role="alert"
+              className="mt-4 rounded-lg border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive"
+            >
+              {erroGeral}
+            </div>
+          )}
 
           {sucesso && (
             <div
@@ -246,7 +299,12 @@ function CadastroPage() {
             </span>
           </div>
 
-          {pessoas.length === 0 ? (
+          {isLoading ? (
+            <p className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando cadastros...
+            </p>
+          ) : pessoas.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
               Nenhuma pessoa cadastrada ainda.
             </p>
@@ -275,8 +333,9 @@ function CadastroPage() {
                   <button
                     type="button"
                     onClick={() => excluir(pessoa.id)}
+                    disabled={excluirMutation.isPending}
                     aria-label={`Excluir ${pessoa.nome}`}
-                    className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive"
+                    className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive disabled:opacity-50"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
