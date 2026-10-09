@@ -333,8 +333,9 @@ function CadastroPage() {
                   <button
                     type="button"
                     onClick={() => excluir(pessoa.id)}
+                    disabled={excluirMutation.isPending}
                     aria-label={`Excluir ${pessoa.nome}`}
-                    className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive"
+                    className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive disabled:opacity-50"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
