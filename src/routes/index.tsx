@@ -65,10 +65,57 @@ type Erros = Partial<Record<"nome" | "email" | "telefone" | "cidade", string>>;
 const campoVazio = { nome: "", email: "", telefone: "", cidade: "" };
 
 function CadastroPage() {
+  const queryClient = useQueryClient();
   const [campos, setCampos] = useState(campoVazio);
   const [erros, setErros] = useState<Erros>({});
-  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [sucesso, setSucesso] = useState(false);
+  const [erroGeral, setErroGeral] = useState<string | null>(null);
+
+  const { data: pessoas = [], isLoading } = useQuery({
+    queryKey: ["pessoas"],
+    queryFn: async (): Promise<Pessoa[]> => {
+      const { data, error } = await supabase
+        .from("pessoas")
+        .select("id, nome, email, telefone, cidade, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const cadastrarMutation = useMutation({
+    mutationFn: async (dados: z.infer<typeof pessoaSchema>) => {
+      const { error } = await supabase.from("pessoas").insert({
+        nome: dados.nome,
+        email: dados.email,
+        telefone: dados.telefone || null,
+        cidade: dados.cidade || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pessoas"] });
+      setCampos(campoVazio);
+      setErros({});
+      setSucesso(true);
+    },
+    onError: () => {
+      setErroGeral("Não foi possível salvar o cadastro. Tente novamente.");
+    },
+  });
+
+  const excluirMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("pessoas").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pessoas"] });
+    },
+    onError: () => {
+      setErroGeral("Não foi possível excluir o cadastro. Tente novamente.");
+    },
+  });
 
   function atualizar(campo: keyof typeof campoVazio, valor: string) {
     setCampos((anterior) => ({ ...anterior, [campo]: valor }));
