@@ -257,11 +257,25 @@ function CadastroPage() {
 
           <button
             type="submit"
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            disabled={cadastrarMutation.isPending}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            <UserPlus className="h-4 w-4" />
-            Cadastrar
+            {cadastrarMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <UserPlus className="h-4 w-4" />
+            )}
+            {cadastrarMutation.isPending ? "Cadastrando..." : "Cadastrar"}
           </button>
+
+          {erroGeral && (
+            <div
+              role="alert"
+              className="mt-4 rounded-lg border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive"
+            >
+              {erroGeral}
+            </div>
+          )}
 
           {sucesso && (
             <div
